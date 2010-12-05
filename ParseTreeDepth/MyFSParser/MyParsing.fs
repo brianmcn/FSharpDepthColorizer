@@ -374,62 +374,130 @@ and GetRangesSynModuleOrNamespace (ModuleOrNamespace(_longIdent, _isModule, synM
     (synModuleDecls |> List.collect GetRangesSynModuleDecl)
 
 and GetRangesSynExpr expr =
+    GetRangesSynExprK expr id
+
+and GetRangesSynExprK expr k=
     match expr with 
-    | SynExpr.Paren(synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.Quote(synExpr, _, synExpr2, _range) -> GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.Const(_synConst, _range) -> []
-    | SynExpr.Typed(synExpr, _synType, _range) -> GetRangesSynExpr synExpr
+    | SynExpr.Paren(synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.Quote(synExpr, _, synExpr2, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (r1 @ r2)))
+    | SynExpr.Const(_synConst, _range) -> k[]
+    | SynExpr.Typed(synExpr, _synType, _range) -> GetRangesSynExprK synExpr k
     | SynExpr.Tuple(synExprList, _range) -> synExprList |> List.collect GetRangesSynExpr
-    | SynExpr.ArrayOrList(_, synExprList, _range) -> synExprList |> List.collect GetRangesSynExpr
-    | SynExpr.Record(_) -> []
-    | SynExpr.New(_, _synType, synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.ObjExpr(_) -> []
-    | SynExpr.While(_sequencePointInfoForWhileLoop, synExpr, synExpr2, _range) -> RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.For(_sequencePointInfoForForLoop, _ident, synExpr, _, synExpr2, synExpr3, _range) -> RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: RangeOfSynExpr synExpr3 :: GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2 @ GetRangesSynExpr synExpr3
-    | SynExpr.ForEach(_sequencePointInfoForForLoop, _seqExprOnly, _synPat, synExpr, synExpr2, _range) -> RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.ArrayOrListOfSeqExpr(_, synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.CompExpr(_, _, synExpr, _range) -> RangeOfSynExpr synExpr :: GetRangesSynExpr synExpr
-    | SynExpr.Lambda(_, _, _synSimplePats, synExpr, _range) -> RangeOfSynExpr synExpr :: GetRangesSynExpr synExpr
-    | SynExpr.Match(_sequencePointInfoForBinding, synExpr, synMatchClauseList, _, _range) -> GetRangesSynExpr synExpr @ (synMatchClauseList |> List.collect GetRangesSynMatchClause)
-    | SynExpr.Do(synExpr, _range) -> RangeOfSynExpr synExpr :: GetRangesSynExpr synExpr
-    | SynExpr.Assert(synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.App(_exprAtomicFlag, synExpr, synExpr2, _range) -> GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.TypeApp(synExpr, _synTypeList, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.LetOrUse(_, _, synBindingList, synExpr, _range) -> GetRangesSynExpr synExpr @ (synBindingList |> List.collect GetRangesSynBinding)
-    | SynExpr.TryWith(synExpr, _range, synMatchClauseList, _range2, _range3, _sequencePointInfoForTry, _sequencePointInfoForWith) -> RangeOfSynExpr synExpr :: GetRangesSynExpr synExpr @ (synMatchClauseList |> List.collect GetRangesSynMatchClause)
-    | SynExpr.TryFinally(synExpr, synExpr2, _range, _sequencePointInfoForTry, _sequencePointInfoForFinally) -> RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.Lazy(synExpr, _range) -> RangeOfSynExpr synExpr :: GetRangesSynExpr synExpr
-    | SynExpr.Seq(_sequencePointInfoForSeq, _, synExpr, synExpr2, _range) -> GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.IfThenElse(synExpr, synExpr2, synExprOpt, _sequencePointInfoForBinding, _range, _range2) -> RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2 @ (match synExprOpt with | None -> [] | Some(x) -> RangeOfSynExpr x :: GetRangesSynExpr x)
-    | SynExpr.Ident(_ident) -> []
-    | SynExpr.LongIdent(_, _longIdent, _range) -> []
-    | SynExpr.LongIdentSet(_longIdent, synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.DotGet(synExpr, _longIdent, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.DotSet(synExpr, _longIdent, synExpr2, _range) -> GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.DotIndexedGet(synExpr, synExprList, _range, _range2) -> GetRangesSynExpr synExpr @ (synExprList |> List.collect GetRangesSynExpr)
-    | SynExpr.DotIndexedSet(synExpr, synExprList, synExpr2, _range, _range2) -> GetRangesSynExpr synExpr @ (synExprList |> List.collect GetRangesSynExpr) @  GetRangesSynExpr synExpr2
-    | SynExpr.NamedIndexedPropertySet(_longIdent, synExpr, synExpr2, _range) -> GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.DotNamedIndexedPropertySet(synExpr, _longIdent, synExpr2, synExpr3, _range) ->  GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2 @ GetRangesSynExpr synExpr3
-    | SynExpr.TypeTest(synExpr, _synType, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.Upcast(synExpr, _synType, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.Downcast(synExpr, _synType, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.InferredUpcast(synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.InferredDowncast(synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.Null(_range) -> []
-    | SynExpr.AddressOf(_, synExpr, _range, _range2) -> GetRangesSynExpr synExpr
-    | SynExpr.TraitCall(_synTyparList, _synMemberSig, synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.ImplicitZero(_range) -> []
-    | SynExpr.YieldOrReturn(_, synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.YieldOrReturnFrom(_, synExpr, _range) -> GetRangesSynExpr synExpr
-    | SynExpr.LetOrUseBang(_sequencePointInfoForBinding, _, _synPat, synExpr, synExpr2, _range) -> RangeOfSynExpr synExpr :: (* RangeOfSynExpr synExpr2 :: *) GetRangesSynExpr synExpr @ GetRangesSynExpr synExpr2
-    | SynExpr.DoBang(synExpr, _range) -> RangeOfSynExpr synExpr :: GetRangesSynExpr synExpr
-    | SynExpr.DeprecatedTypeOf(_synType, _range) -> []
-    | SynExpr.LibraryOnlyILAssembly _ -> []
-    | SynExpr.LibraryOnlyStaticOptimization _ -> []
-    | SynExpr.LibraryOnlyUnionCaseFieldGet _ -> []
-    | SynExpr.LibraryOnlyUnionCaseFieldSet _ -> []
-    | SynExpr.ArbitraryAfterError(_range) -> []
-    | SynExpr.DiscardAfterError(synExpr, _range) -> GetRangesSynExpr synExpr
+    | SynExpr.ArrayOrList(_, synExprList, _range) -> k(synExprList |> List.collect GetRangesSynExpr)
+    | SynExpr.Record(_) -> k[]
+    | SynExpr.New(_, _synType, synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.ObjExpr(_) -> k[]
+    | SynExpr.While(_sequencePointInfoForWhileLoop, synExpr, synExpr2, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: r1 @ r2)))
+    | SynExpr.For(_sequencePointInfoForForLoop, _ident, synExpr, _, synExpr2, synExpr3, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        GetRangesSynExprK synExpr3 (fun r3 ->
+        k (RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: RangeOfSynExpr synExpr3 :: r1 @ r2 @ r3))))
+    | SynExpr.ForEach(_sequencePointInfoForForLoop, _seqExprOnly, _synPat, synExpr, synExpr2, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: r1 @ r2)))
+    | SynExpr.ArrayOrListOfSeqExpr(_, synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.CompExpr(_, _, synExpr, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        k (RangeOfSynExpr synExpr :: r1))
+    | SynExpr.Lambda(_, _, _synSimplePats, synExpr, _range) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        k (RangeOfSynExpr synExpr :: r1))
+    | SynExpr.Match(_sequencePointInfoForBinding, synExpr, synMatchClauseList, _, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        k ( r1 @ (synMatchClauseList |> List.collect GetRangesSynMatchClause)))
+    | SynExpr.Do(synExpr, _range) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        k (RangeOfSynExpr synExpr :: r1))
+    | SynExpr.Assert(synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.App(_exprAtomicFlag, synExpr, synExpr2, _range) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (r1 @ r2)))
+    | SynExpr.TypeApp(synExpr, _synTypeList, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.LetOrUse(_, _, synBindingList, synExpr, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        k (r1 @ (synBindingList |> List.collect GetRangesSynBinding)))
+    | SynExpr.TryWith(synExpr, _range, synMatchClauseList, _range2, _range3, _sequencePointInfoForTry, _sequencePointInfoForWith) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        k (RangeOfSynExpr synExpr :: r1 @ (synMatchClauseList |> List.collect GetRangesSynMatchClause)))
+    | SynExpr.TryFinally(synExpr, synExpr2, _range, _sequencePointInfoForTry, _sequencePointInfoForFinally) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: r1 @ r2)))
+    | SynExpr.Lazy(synExpr, _range) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        k (RangeOfSynExpr synExpr :: r1))
+    | SynExpr.Seq(_sequencePointInfoForSeq, _, synExpr, synExpr2, _range) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (r1 @ r2)))
+    | SynExpr.IfThenElse(synExpr, synExpr2, synExprOpt, _sequencePointInfoForBinding, _range, _range2) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        match synExprOpt with 
+        | None -> 
+            k (RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: r1 @ r2)
+        | Some(x) -> 
+            GetRangesSynExprK x (fun r3 ->
+            k (RangeOfSynExpr synExpr :: RangeOfSynExpr synExpr2 :: r1 @ r2 @ (RangeOfSynExpr x :: r3)))
+        ))
+    | SynExpr.Ident(_ident) -> k[]
+    | SynExpr.LongIdent(_, _longIdent, _range) -> k[]
+    | SynExpr.LongIdentSet(_longIdent, synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.DotGet(synExpr, _longIdent, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.DotSet(synExpr, _longIdent, synExpr2, _range) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (r1 @ r2)))
+    | SynExpr.DotIndexedGet(synExpr, synExprList, _range, _range2) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        k (r1 @ (synExprList |> List.collect GetRangesSynExpr)))
+    | SynExpr.DotIndexedSet(synExpr, synExprList, synExpr2, _range, _range2) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (r1 @ (synExprList |> List.collect GetRangesSynExpr) @ r2)))
+    | SynExpr.NamedIndexedPropertySet(_longIdent, synExpr, synExpr2, _range) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (r1 @ r2)))
+    | SynExpr.DotNamedIndexedPropertySet(synExpr, _longIdent, synExpr2, synExpr3, _range) ->
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        GetRangesSynExprK synExpr3 (fun r3 ->
+        k (r1 @ r2 @ r3))))
+    | SynExpr.TypeTest(synExpr, _synType, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.Upcast(synExpr, _synType, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.Downcast(synExpr, _synType, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.InferredUpcast(synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.InferredDowncast(synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.Null(_range) -> k[]
+    | SynExpr.AddressOf(_, synExpr, _range, _range2) -> GetRangesSynExprK synExpr k
+    | SynExpr.TraitCall(_synTyparList, _synMemberSig, synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.ImplicitZero(_range) -> k[]
+    | SynExpr.YieldOrReturn(_, synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.YieldOrReturnFrom(_, synExpr, _range) -> GetRangesSynExprK synExpr k
+    | SynExpr.LetOrUseBang(_sequencePointInfoForBinding, _, _synPat, synExpr, synExpr2, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        GetRangesSynExprK synExpr2 (fun r2 ->
+        k (RangeOfSynExpr synExpr :: (* RangeOfSynExpr synExpr2 :: *) r1 @ r2)))
+    | SynExpr.DoBang(synExpr, _range) -> 
+        GetRangesSynExprK synExpr (fun r1 ->
+        k (RangeOfSynExpr synExpr :: r1))
+    | SynExpr.DeprecatedTypeOf(_synType, _range) -> k[]
+    | SynExpr.LibraryOnlyILAssembly _ -> k[]
+    | SynExpr.LibraryOnlyStaticOptimization _ -> k[]
+    | SynExpr.LibraryOnlyUnionCaseFieldGet _ -> k[]
+    | SynExpr.LibraryOnlyUnionCaseFieldSet _ -> k[]
+    | SynExpr.ArbitraryAfterError(_range) -> k[]
+    | SynExpr.DiscardAfterError(synExpr, _range) -> GetRangesSynExprK synExpr k
 
 and GetRangesSynTypeDefn (SynTypeDefn.TypeDefn(_synComponentInfo, synTypeDefnRepr, synMemberDefns, _tRange)) =
     let stuff = 

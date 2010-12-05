@@ -3,8 +3,8 @@
   <Identifier Id="FSharpDepthColorizer">
     <Name>F# Depth Colorizer</Name>
     <Author>Brian McNamara</Author>
-    <Version>0.7</Version>
-    <Description xml:space="preserve">Use the F# parse control-flow depth to colorize code to show structure</Description>
+    <Version>0.8</Version>
+    <Description xml:space="preserve">Use the F# parse control-flow depth to colorize code to show structure (fsharp)</Description>
     <Locale>1033</Locale>
     <Icon>FSColor.png</Icon>
     <PreviewImage>FSColor.png</PreviewImage>
